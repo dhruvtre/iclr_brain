@@ -135,7 +135,12 @@ def main():
             submit_disabled = len(st.session_state.selected_papers) == 0
             if st.button("Generate", disabled=submit_disabled, use_container_width=True):
                 logger.info("Generation requested")
+
                 st.session_state.generating = True
+                st.session_state.save_successful = False
+                st.session_state.content_generated = False
+                st.session_state.save_error = ""
+                st.session_state.tags_input = ""
 
                 # Get the content for each selected paper
                 papers_with_content = {}
@@ -157,7 +162,9 @@ def main():
         
         if 'generating' in st.session_state and st.session_state.generating:
             if not st.session_state.get('content_generated', False):
+
                 logger.info(f"Generating state is True. Session state keys: {list(st.session_state.keys())}")
+
                 st.info("Starting markdown content fetch.")
                 if 'papers_with_content' in st.session_state and st.session_state.papers_with_content:
                     logger.info(f"Found papers_with_content with {len(st.session_state.papers_with_content)} papers")
@@ -212,46 +219,39 @@ def main():
                         logger.info("Checking parsed_response in session state")
                         if st.session_state.parsed_response['success']:
                             logger.info("Parsed response is successful, rendering output")
-
-                            # Show raw response in expander
-                            with st.expander("Raw Model Response", expanded=False):
-                                st.code(str(st.session_state.raw_model_response), language="json")
-                
-                            # Show usage information if available
-                            if 'usage' in st.session_state.parsed_response:
-                                usage = st.session_state.parsed_response['usage'].get('total_tokens', 'unknown')
-                                logger.info(f"Token usage: {usage}")
-                                st.caption(f"Tokens used: {usage}")
-                        
-                            # Display the generated research idea
-                            logger.info("Rendering research idea expander")
-                            with st.expander("Generated Research Idea", expanded=False):
-                                st.markdown(st.session_state.parsed_response['content'])
-                            
                             st.session_state.content_generated = True
                         else:
                             logger.info("Content already generated, showing save form")
-                        
-                    if st.session_state.get('content_generated', False) and 'parsed_response' in st.session_state:
-                        logger.info("About to render save generation form")
-                        # Use the new frontend component
-                        save_status = render_save_generation_form(
-                            parsed_response=st.session_state.parsed_response,
-                            run_id=st.session_state.run_id,
-                            selected_papers=st.session_state.selected_papers,
-                            prompt_generated=None,
-                            selected_model=st.session_state.selected_model,
-                            supabase_client=st.session_state.supabase_client
-                        )
-                        if save_status:
-                            logger.info("Save was successful, marking generation as complete")
-                            logger.info("Setting generating to False")
-                            st.session_state.has_generated_content = True
-                            st.session_state.generating = False
-                            if not st.session_state.get('save_successful', False):
-                                st.session_state.save_successful = True
-                        else:
-                            logger.info("Save form rendered but no save action taken yet")
+            
+            if st.session_state.get('content_generated', False) and 'parsed_response' in st.session_state:
+                logger.info("Rendering previously generated output")
+
+                with st.expander("Raw Model Response", expanded=False):
+                    st.code(str(st.session_state.raw_model_response), language="json")
+
+                usage = st.session_state.parsed_response.get('usage', {}).get('total_tokens', 'unknown')
+                st.caption(f"Tokens used: {usage}")
+
+                with st.expander("Generated Research Idea", expanded=False):
+                    st.markdown(st.session_state.parsed_response['content'])
+
+                # rendering save button
+                save_status = render_save_generation_form(
+                    parsed_response=st.session_state.parsed_response,
+                    run_id=st.session_state.run_id,
+                    selected_papers=st.session_state.selected_papers,
+                    prompt_generated=None,
+                    selected_model=st.session_state.selected_model,
+                    supabase_client=st.session_state.supabase_client
+                )
+                if save_status:
+                    st.success("Generation saved!")
+                    if st.button("Clear panel"):
+                        for k in ("generating","content_generated","save_successful","save_error"):
+                            st.session_state[k] = False
+                        st.session_state.selected_papers = []
+                        if "tags_input" in st.session_state:
+                            del st.session_state.tags_input
         else:
             st.info("Select papers and fill the prompt builder, then click 'Generate' to see responses.")
 

@@ -246,6 +246,8 @@ def render_save_generation_form(parsed_response, run_id, selected_papers, prompt
             
             if result:
                 st.session_state.save_successful = True
+                st.session_state.generating = True 
+                st.session_state.content_generated = True
             
         except Exception as e:
             st.session_state.save_error = str(e)
